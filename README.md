@@ -1,31 +1,10 @@
-FedhaSmart******
+****FEDHA SMART This project is built to help people with managing and tracking their finances. It allows one to add their income from whichever source, budget money according to different categories, track their expenses, creating and contributing towards a savings goal(s).
 
-FedhaSmart is a simple, reliable tool for anyone who wants to understand where their money goes. It helps you record income from different sources, plan your spending, track daily expenses, and stay consistent with your savings goals. Everything lives in one place so you can get a clear picture of your financial life without the clutter.
+This project is built with:
 
-****Features****
-
-Add income from any source
-
-Create budgets by category
-
-Track expenses in real time
-
-Set savings goals and monitor progress
-
-Clean, modern UI
-
-Secure data storage backed by Supabase
-
-****Tech Stack****
-
-FedhaSmart is built using:
-
-Vite – Fast dev environment
-
-React + TypeScript – Strong typing with a smooth UI
-
-shadcn-ui – Reusable components with a clean design
-
-Tailwind CSS – Utility-first styling
-
-Supabase – Authentication, database, and storage
+Vite
+TypeScript
+React
+shadcn-ui
+Tailwind CSS
+Supabase
