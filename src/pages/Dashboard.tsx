@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navbar } from '@/components/Navbar';
@@ -24,6 +24,7 @@ import {
   PiggyBank,
   Calculator,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -41,6 +42,7 @@ export default function Dashboard() {
   });
   const [expensesByCategory, setExpensesByCategory] = useState<any[]>([]);
   const [dailyExpenses, setDailyExpenses] = useState<any[]>([]);
+  const [dashboardLoading, setDashboardLoading] = useState(true); // Local loading state
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -51,48 +53,59 @@ export default function Dashboard() {
   }, [user]);
 
   const loadDashboardData = async () => {
+    setDashboardLoading(true);
     try {
       const currentMonth = new Date();
       currentMonth.setDate(1);
+      const startOfMonth = currentMonth.toISOString().split('T')[0];
 
-      // Fetch all expenses for current month
-      const { data: expenses } = await supabase
-        .from('expenses')
-        .select('amount, category, date')
-        .gte('date', currentMonth.toISOString().split('T')[0])
-        .order('date', { ascending: true });
+      // OPTIMIZATION: Run all independent queries in parallel
+      const [expensesResult, incomeResult, goalsResult, contributionsResult] = await Promise.all([
+        // 1. Fetch Expenses (Current Month)
+        supabase
+          .from('expenses')
+          .select('amount, category, date')
+          .gte('date', startOfMonth)
+          .order('date', { ascending: true }),
 
-      const totalExpenses =
-        expenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
+        // 2. Fetch Income (Current Month)
+        supabase
+          .from('income')
+          .select('amount')
+          .gte('date', startOfMonth),
 
-      // Fetch total income
-      const { data: income } = await supabase
-        .from('income')
-        .select('amount')
-        .gte('date', currentMonth.toISOString().split('T')[0]);
+        // 3. Fetch Goals (All active) - Optimized to select only needed fields
+        supabase
+          .from('goals')
+          .select('saved_amount'),
 
-      const totalIncome =
-        income?.reduce((sum, inc) => sum + Number(inc.amount), 0) || 0;
+        // 4. Fetch Contributions (Current Month)
+        supabase
+          .from('contributions')
+          .select('amount')
+          .gte('date', startOfMonth)
+      ]);
 
-      // Fetch goals and contributions
-      const { data: goals } = await supabase.from('goals').select('*');
-      const savingsProgress =
-        goals?.reduce((sum, g) => sum + Number(g.saved_amount), 0) || 0;
+      // -- Process Expenses --
+      const expenses = expensesResult.data || [];
+      const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 
-      const { data: contributions } = await supabase
-        .from('contributions')
-        .select('amount, date')
-        .gte('date', currentMonth.toISOString().split('T')[0]);
+      // -- Process Income --
+      const income = incomeResult.data || [];
+      const totalIncome = income.reduce((sum, inc) => sum + Number(inc.amount), 0);
 
-      const totalContributions =
-        contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      // -- Process Goals --
+      const goals = goalsResult.data || [];
+      const savingsProgress = goals.reduce((sum, g) => sum + Number(g.saved_amount), 0);
 
-      // Compute stats
+      // -- Process Contributions --
+      const contributions = contributionsResult.data || [];
+      const totalContributions = contributions.reduce((sum, c) => sum + Number(c.amount), 0);
+
+      // -- Calculate Derived Stats --
       const netBalance = totalIncome - totalExpenses - totalContributions;
-      const savingsRate =
-        totalIncome > 0
-          ? ((totalIncome - totalExpenses - totalContributions) / totalIncome) *
-            100
+      const savingsRate = totalIncome > 0
+          ? ((totalIncome - totalExpenses - totalContributions) / totalIncome) * 100
           : 0;
 
       setStats({
@@ -101,14 +114,16 @@ export default function Dashboard() {
         remainingBudget: totalIncome - totalExpenses,
         savingsProgress,
         totalContributions,
-        goalCount: goals?.length || 0,
+        goalCount: goals.length,
         netBalance,
         savingsRate,
       });
 
-      // Group expenses by category for Pie chart
+      // -- Group Data for Charts --
+      
+      // Pie Chart: Expenses by Category
       const categoryMap = new Map();
-      expenses?.forEach((exp) => {
+      expenses.forEach((exp) => {
         const current = categoryMap.get(exp.category) || 0;
         categoryMap.set(exp.category, current + Number(exp.amount));
       });
@@ -117,21 +132,23 @@ export default function Dashboard() {
       );
       setExpensesByCategory(categoryData);
 
-      // Group expenses by day for line chart
+      // Line Chart: Expenses by Day
       const dailyMap = new Map();
-      expenses?.forEach((exp) => {
+      expenses.forEach((exp) => {
         const day = exp.date.split('T')[0];
         const current = dailyMap.get(day) || 0;
         dailyMap.set(day, current + Number(exp.amount));
       });
-
       const dailyData = Array.from(dailyMap.entries())
         .map(([day, amount]) => ({ day, amount }))
         .sort((a, b) => new Date(a.day).getTime() - new Date(b.day).getTime());
 
       setDailyExpenses(dailyData);
+
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -152,10 +169,26 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus();
 
-  if (authLoading)
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-
-  if (!user) return null;
+  // Loading Skeleton View
+  if (authLoading || dashboardLoading || !user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8 space-y-8">
+          <div className="h-8 w-48 bg-muted/20 rounded animate-pulse mb-8" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {[...Array(6)].map((_, i) => (
+               <Skeleton key={i} className="h-32 w-full rounded-xl" />
+             ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -268,7 +301,7 @@ export default function Dashboard() {
                 {healthStatus.label}
               </div>
               <p className="text-xs text-muted-foreground">
-                {stats.savingsRate.toFixed(1)}%
+                {stats.savingsRate.toFixed(1)}% savings rate
               </p>
             </CardContent>
           </Card>
@@ -308,7 +341,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No expense data available
+                  No expense data available for this month
                 </div>
               )}
             </CardContent>
@@ -332,7 +365,7 @@ export default function Dashboard() {
                      dataKey="date"
                      type="number"
                      scale="time"
-                     domain={["dataMin - 8640000", "dataMax + 8640000"]} // adds 1-day padding before & after
+                     domain={["dataMin - 8640000", "dataMax + 8640000"]}
                      tickFormatter={(timestamp) =>
                      new Date(timestamp).toLocaleDateString("en-KE", {
                        month: "short",
@@ -368,7 +401,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No daily data available
+                  No daily data available for this month
                 </div>
               )}
             </CardContent>

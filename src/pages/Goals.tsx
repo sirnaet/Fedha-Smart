@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, TrendingUp } from 'lucide-react';
+import { Plus, TrendingUp, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export default function Goals() {
@@ -19,7 +19,11 @@ export default function Goals() {
   const [goals, setGoals] = useState<any[]>([]);
   const [openGoal, setOpenGoal] = useState(false);
   const [openContribution, setOpenContribution] = useState(false);
+  
+  // State for editing
+  const [editingGoal, setEditingGoal] = useState<any | null>(null);
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
+  
   const [goalFormData, setGoalFormData] = useState({
     name: '',
     targetAmount: '',
@@ -52,23 +56,68 @@ export default function Goals() {
     }
   };
 
-  const handleCreateGoal = async (e: React.FormEvent) => {
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpenGoal(isOpen);
+    if (!isOpen) {
+      setEditingGoal(null);
+      setGoalFormData({ name: '', targetAmount: '', deadline: '' });
+    }
+  };
+
+  const handleEditClick = (goal: any) => {
+    setEditingGoal(goal);
+    setGoalFormData({
+      name: goal.name,
+      targetAmount: goal.target_amount.toString(),
+      deadline: goal.deadline || '',
+    });
+    setOpenGoal(true);
+  };
+
+  const handleDeleteGoal = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this goal? This will also delete all contributions history for this goal.")) return;
+
+    const { error } = await supabase.from('goals').delete().eq('id', id);
+
+    if (error) {
+      toast.error('Failed to delete goal');
+    } else {
+      toast.success('Goal deleted successfully');
+      loadGoals();
+    }
+  };
+
+  const handleSubmitGoal = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user) return;
 
-    const { error } = await supabase.from('goals').insert({
+    const payload = {
       user_id: user.id,
       name: goalFormData.name,
       target_amount: parseFloat(goalFormData.targetAmount),
       deadline: goalFormData.deadline || null,
-    });
+    };
+
+    let error;
+
+    if (editingGoal) {
+      const { error: updateError } = await supabase
+        .from('goals')
+        .update(payload)
+        .eq('id', editingGoal.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('goals')
+        .insert(payload);
+      error = insertError;
+    }
 
     if (error) {
-      toast.error('Failed to create goal');
+      toast.error(editingGoal ? 'Failed to update goal' : 'Failed to create goal');
     } else {
-      toast.success('Goal created successfully');
-      setGoalFormData({ name: '', targetAmount: '', deadline: '' });
+      toast.success(editingGoal ? 'Goal updated successfully' : 'Goal created successfully');
       setOpenGoal(false);
       loadGoals();
     }
@@ -89,18 +138,21 @@ export default function Goals() {
       toast.error('Failed to add contribution');
     } else {
       const goal = goals.find((g) => g.id === selectedGoal);
-      const newSavedAmount = parseFloat(goal.saved_amount) + parseFloat(contributionAmount);
+      
+      // Safety check: treat null saved_amount as 0
+      const oldSavedAmount = parseFloat(goal.saved_amount || 0); 
+      const contribution = parseFloat(contributionAmount);
+      const newSavedAmount = oldSavedAmount + contribution;
       const percentage = (newSavedAmount / parseFloat(goal.target_amount)) * 100;
 
-      // Check milestones
       if (percentage >= 100) {
         toast.success('🎉 Goal achieved! Congratulations!');
-      } else if (percentage >= 75 && parseFloat(goal.saved_amount) / parseFloat(goal.target_amount) * 100 < 75) {
-        toast.success('🎯 75% milestone reached!');
-      } else if (percentage >= 50 && parseFloat(goal.saved_amount) / parseFloat(goal.target_amount) * 100 < 50) {
-        toast.success('🎯 50% milestone reached!');
-      } else if (percentage >= 25 && parseFloat(goal.saved_amount) / parseFloat(goal.target_amount) * 100 < 25) {
-        toast.success('🎯 25% milestone reached!');
+      } else if (percentage >= 75 && oldSavedAmount / parseFloat(goal.target_amount) * 100 < 75) {
+        toast.success('🚀 75% milestone reached!');
+      } else if (percentage >= 50 && oldSavedAmount / parseFloat(goal.target_amount) * 100 < 50) {
+        toast.success('🔥 50% milestone reached!');
+      } else if (percentage >= 25 && oldSavedAmount / parseFloat(goal.target_amount) * 100 < 25) {
+        toast.success('👍 25% milestone reached!');
       } else {
         toast.success('Contribution added successfully');
       }
@@ -112,12 +164,13 @@ export default function Goals() {
     }
   };
 
-  const getMilestoneColor = (percentage: number) => {
-    if (percentage >= 100) return 'bg-success';
-    if (percentage >= 75) return 'bg-chart-3';
-    if (percentage >= 50) return 'bg-chart-2';
-    if (percentage >= 25) return 'bg-chart-4';
-    return 'bg-primary';
+  // NEW: Helper to get both track (background) and indicator (foreground) colors
+  const getMilestoneColors = (percentage: number) => {
+    if (percentage >= 100) return { track: 'bg-success/20', indicator: 'bg-success' };
+    if (percentage >= 75) return { track: 'bg-chart-3/20', indicator: 'bg-chart-3' };
+    if (percentage >= 50) return { track: 'bg-chart-2/20', indicator: 'bg-chart-2' };
+    if (percentage >= 25) return { track: 'bg-chart-4/20', indicator: 'bg-chart-4' };
+    return { track: 'bg-primary/20', indicator: 'bg-primary' };
   };
 
   if (authLoading) {
@@ -132,7 +185,8 @@ export default function Goals() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Savings Goals</h1>
-          <Dialog open={openGoal} onOpenChange={setOpenGoal}>
+          
+          <Dialog open={openGoal} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -141,9 +195,9 @@ export default function Goals() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Savings Goal</DialogTitle>
+                <DialogTitle>{editingGoal ? 'Edit Goal' : 'Create New Savings Goal'}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreateGoal} className="space-y-4">
+              <form onSubmit={handleSubmitGoal} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Goal Name</Label>
                   <Input
@@ -177,7 +231,9 @@ export default function Goals() {
                     onChange={(e) => setGoalFormData({ ...goalFormData, deadline: e.target.value })}
                   />
                 </div>
-                <Button type="submit" className="w-full">Create Goal</Button>
+                <Button type="submit" className="w-full">
+                  {editingGoal ? 'Update Goal' : 'Create Goal'}
+                </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -192,31 +248,62 @@ export default function Goals() {
             </Card>
           ) : (
             goals.map((goal) => {
-              const percentage = (parseFloat(goal.saved_amount) / parseFloat(goal.target_amount)) * 100;
+              // FIX: Safely parse and default saved_amount to 0 if null/undefined
+              const savedAmount = parseFloat(goal.saved_amount || 0);
+              const targetAmount = parseFloat(goal.target_amount);
+              
+              const percentage = (savedAmount / targetAmount) * 100;
               const isComplete = percentage >= 100;
+              const colors = getMilestoneColors(percentage);
 
               return (
                 <Card key={goal.id} className={isComplete ? 'border-success' : ''}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">{goal.name}</CardTitle>
-                      {isComplete && <Badge variant="default" className="bg-success">Completed!</Badge>}
+                      <div className="space-y-1">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {goal.name}
+                          {isComplete && <Badge variant="default" className="bg-success hover:bg-success">Completed!</Badge>}
+                        </CardTitle>
+                        {goal.deadline && (
+                          <p className="text-xs text-muted-foreground">
+                            Due: {new Date(goal.deadline).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(goal)}>
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                          onClick={() => handleDeleteGoal(goal.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    {goal.deadline && (
-                      <p className="text-xs text-muted-foreground">
-                        Due: {new Date(goal.deadline).toLocaleDateString()}
-                      </p>
-                    )}
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-muted-foreground">Progress</span>
                         <span className="font-medium">
-                          KES {parseFloat(goal.saved_amount).toLocaleString()} / KES {parseFloat(goal.target_amount).toLocaleString()}
+                          {/* Use the safely parsed amounts for display */}
+                          KES {savedAmount.toLocaleString()} / KES {targetAmount.toLocaleString()}
                         </span>
                       </div>
-                      <Progress value={Math.min(percentage, 100)} />
+                      
+                      {/* UPDATED: Using the new dual-color properties */}
+                      <Progress 
+                        value={Math.min(percentage, 100)} 
+                        className={colors.track}           // Lighter background
+                        indicatorClassName={colors.indicator} // Darker progress bar
+                      />
+                      
                       <p className="text-xs text-muted-foreground mt-1">
                         {percentage.toFixed(1)}% saved
                       </p>
