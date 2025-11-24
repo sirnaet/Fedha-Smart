@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -29,13 +29,8 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const [isPasswordReset, setIsPasswordReset] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     if (user) {
@@ -43,26 +38,18 @@ export default function Auth() {
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    const hash = location.hash;
-    if (hash && hash.includes('access_token')) {
-      setIsPasswordReset(true);
-      toast.info('Please set your new password.');
-    }
-  }, [location.hash]);
-
-  // --- OAuth Handler ---
+  // --- Google OAuth Handler ---
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          // Supabase handles the redirect; ensure this matches your dashboard settings
           redirectTo: `${window.location.origin}/dashboard`,
         },
       });
       if (error) throw error;
-      // Note: Redirect happens automatically, so no toast needed here
     } catch (error: any) {
       toast.error(error.message || 'Failed to login with Google');
       setLoading(false);
@@ -128,7 +115,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: `${window.location.origin}/update-password`,
       });
 
       if (error) throw error;
@@ -140,55 +127,8 @@ export default function Auth() {
       setLoading(false);
     }
   };
-  
-  const handleNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
 
-      if (error) throw error;
-
-      toast.success('Password updated successfully! You are now signed in.');
-      setIsPasswordReset(false);
-      setNewPassword('');
-      navigate('/dashboard');
-      
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update password. Please try the reset link again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const NewPasswordForm = (
-    <CardContent>
-      <form onSubmit={handleNewPassword} className="space-y-4">
-        <div className="space-y-2">
-          <CardTitle className="text-xl">Set New Password</CardTitle>
-          <CardDescription>Enter a new secure password for your account.</CardDescription>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="new-password">New Password</Label>
-          <Input
-            id="new-password"
-            type="password"
-            placeholder="••••••••"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-            minLength={6}
-          />
-        </div>
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Updating password...' : 'Set New Password'}
-        </Button>
-      </form>
-    </CardContent>
-  );
-
-  // Helper for the divider and Google button
+  // Helper component for Google Button UI
   const GoogleAuthSection = () => (
     <div className="space-y-4 mt-4">
       <div className="relative">
@@ -220,100 +160,99 @@ export default function Auth() {
           <CardTitle className="text-2xl">FedhaSmart Tracker</CardTitle>
           <CardDescription>Manage your money with confidence</CardDescription>
         </CardHeader>
-        
-        {isPasswordReset ? (
-          NewPasswordForm
-        ) : (
-          <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
+        <CardContent>
+          <Tabs defaultValue="signin" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signin">Sign In</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
 
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Signing in...' : 'Sign In'}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={handlePasswordReset}
-                    disabled={loading}
-                    className="text-sm text-primary hover:underline w-full text-center"
-                  >
-                    Forgot password?
-                  </button>
-                </form>
-                <GoogleAuthSection />
-              </TabsContent>
+            <TabsContent value="signin">
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signin-email">Email</Label>
+                  <Input
+                    id="signin-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signin-password">Password</Label>
+                  <Input
+                    id="signin-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={handlePasswordReset}
+                  disabled={loading}
+                  className="text-sm text-primary hover:underline w-full text-center"
+                >
+                  Forgot password?
+                </button>
+              </form>
+              
+              {/* Google Login Button */}
+              <GoogleAuthSection />
+            </TabsContent>
 
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-phone">Phone (optional)</Label>
-                    <Input
-                      id="signup-phone"
-                      type="tel"
-                      placeholder="+254123456789"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Creating account...' : 'Create Account'}
-                  </Button>
-                </form>
-                <GoogleAuthSection />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        )}
+            <TabsContent value="signup">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Phone (optional)</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="+254123456789"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Creating account...' : 'Create Account'}
+                </Button>
+              </form>
+
+              {/* Google Login Button */}
+              <GoogleAuthSection />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
       </Card>
     </div>
   );
