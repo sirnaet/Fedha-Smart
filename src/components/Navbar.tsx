@@ -12,20 +12,19 @@ export const Navbar = () => {
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard' },
-    { path: '/income', label: 'Income' },
-    { path: '/expenses', label: 'Expenses' },
+    { path: '/transactions', label: 'Transactions' }, // Consolidated link
     { path: '/budgets', label: 'Budgets' },
     { path: '/goals', label: 'Goals' },
   ];
 
   return (
     <nav className="border-b bg-card sticky top-0 z-50">
-      <div className="container mx-auto px-3">
+      <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Link to="/dashboard" className="flex items-center gap-4 font-bold text-lg sm:text-xl text-primary shrink-0">
+          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-lg sm:text-xl text-primary shrink-0">
             <Wallet className="h-5 w-5 sm:h-6 sm:w-6" />
-            <span className="hidden xs:inline">FedhaSmart</span>
-            <span className="xs:hidden">FedhaSmart</span>
+            <span className="hidden sm:inline">FedhaSmart</span>
+            <span className="inline sm:hidden">FS</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-1 flex-1 justify-center">
@@ -41,7 +40,7 @@ export const Navbar = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />
             <Button variant="ghost" asChild size="icon">
               <Link to="/settings">
@@ -55,14 +54,14 @@ export const Navbar = () => {
         </div>
 
         {/* Mobile navigation */}
-        <div className="md:hidden flex gap-1 pb-2 overflow-x-auto scrollbar-hide">
+        <div className="md:hidden flex gap-1 pb-3 overflow-x-auto scrollbar-hide">
           {navItems.map((item) => (
             <Button
               key={item.path}
               variant={location.pathname === item.path ? 'default' : 'ghost'}
               size="sm"
               asChild
-              className="whitespace-nowrap flex-shrink-0"
+              className="whitespace-nowrap flex-shrink-0 h-8 text-xs px-2"
             >
               <Link to={item.path}>{item.label}</Link>
             </Button>

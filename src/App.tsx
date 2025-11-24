@@ -8,8 +8,7 @@ import { ThemeProvider } from "next-themes";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Income from "./pages/Income";
-import Expenses from "./pages/Expenses";
+import Transactions from "./pages/Transactions";
 import Budgets from "./pages/Budgets";
 import Goals from "./pages/Goals";
 import Settings from "./pages/Settings";
@@ -29,8 +28,7 @@ const App = () => (
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/income" element={<Income />} />
-              <Route path="/expenses" element={<Expenses />} />
+              <Route path="/transactions" element={<Transactions />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/goals" element={<Goals />} />
               <Route path="/settings" element={<Settings />} />

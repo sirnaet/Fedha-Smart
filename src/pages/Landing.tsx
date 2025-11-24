@@ -1,7 +1,23 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Wallet, TrendingUp, PiggyBank, Target, BarChart3 } from "lucide-react";
+import { ArrowRight, Wallet, TrendingUp, PiggyBank, Target, BarChart3, Instagram, Linkedin } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+// Custom X Brand Icon (Exact Geometry)
+const XIcon = ({ className }: { className?: string }) => (
+  <svg
+    role="img"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    fill="currentColor"
+    className={className}
+    width="24"
+    height="24"
+  >
+    <title>X</title>
+    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
+  </svg>
+);
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -116,9 +132,47 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; 2025 FedhaSmart. All rights reserved.</p>
+      <footer className="border-t py-8 bg-muted/20">
+        <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          
+          <div className="text-sm text-muted-foreground text-center md:text-left">
+            &copy; {new Date().getFullYear()} FedhaSmart. All rights reserved.
+          </div>
+          
+          <div className="flex items-center gap-6">
+            {/* X (Twitter) Link */}
+            <a 
+              href="https://x.com/Sir__naet" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-muted-foreground hover:text-primary transition-colors"
+              aria-label="Follow us on X"
+            >
+              <XIcon className="h-5 w-5" />
+            </a>
+            
+            {/* Instagram Link */}
+            <a 
+              href="https://instagram.com/sir_naet" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-muted-foreground hover:text-primary transition-colors"
+              aria-label="Follow us on Instagram"
+            >
+              <Instagram className="h-5 w-5" />
+            </a>
+
+            {/* LinkedIn Link */}
+            <a 
+              href="https://linkedin.com/in/brian-s-memusi-a491692ab" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-muted-foreground hover:text-primary transition-colors"
+              aria-label="Follow us on LinkedIn"
+            >
+              <Linkedin className="h-5 w-5" />
+            </a>
+          </div>
         </div>
       </footer>
     </div>
