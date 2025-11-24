@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, AlertCircle } from 'lucide-react';
+import { Plus, AlertCircle, Pencil, Trash2 } from 'lucide-react'; // Added icons
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { addDays, startOfMonth, endOfMonth, areIntervalsOverlapping, parseISO } from 'date-fns';
 
 const CATEGORIES = ['Food', 'Transport', 'Entertainment', 'Shopping', 'Bills', 'Healthcare', 'Other'];
 
@@ -21,10 +22,14 @@ export default function Budgets() {
   const navigate = useNavigate();
   const [budgets, setBudgets] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  
+  // State to track if we are editing a budget
+  const [editingBudget, setEditingBudget] = useState<any | null>(null);
+
   const [formData, setFormData] = useState({
     category: '',
     limitAmount: '',
-    month: new Date().toISOString().substring(0, 7),
+    month: new Date().toISOString().substring(0, 10),
     period: 'monthly' as 'weekly' | 'monthly',
   });
 
@@ -53,33 +58,127 @@ export default function Budgets() {
     }
   };
 
+  const getBudgetRange = (dateStr: string, period: 'weekly' | 'monthly') => {
+    const start = parseISO(dateStr);
+    let end;
+    if (period === 'weekly') {
+      end = addDays(start, 6);
+    } else {
+      end = endOfMonth(start);
+    }
+    const checkStart = period === 'monthly' ? startOfMonth(start) : start;
+    return { start: checkStart, end };
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      // Reset form when dialog closes
+      setEditingBudget(null);
+      setFormData({ 
+        category: '', 
+        limitAmount: '', 
+        month: new Date().toISOString().substring(0, 10), 
+        period: 'monthly' 
+      });
+    }
+  };
+
+  const handleEditClick = (budget: any) => {
+    setEditingBudget(budget);
+    setFormData({
+      category: budget.category,
+      limitAmount: budget.limit_amount.toString(),
+      month: budget.month,
+      period: budget.period,
+    });
+    setOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this budget?")) return;
+
+    const { error } = await supabase.from('budgets').delete().eq('id', id);
+
+    if (error) {
+      toast.error('Failed to delete budget');
+    } else {
+      toast.success('Budget deleted successfully');
+      loadBudgets();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) return;
 
-    // For weekly budgets, use the selected date directly, for monthly add -01
-    const monthDate = formData.period === 'weekly' 
-      ? formData.month 
-      : `${formData.month}-01`;
+    const selectedDate = formData.month;
+    const selectedPeriod = formData.period;
+    const { start: newStart, end: newEnd } = getBudgetRange(selectedDate, selectedPeriod);
 
-    const { error } = await supabase.from('budgets').insert({
+    // 1. CLIENT-SIDE CONFLICT CHECK
+    let query = supabase
+      .from('budgets')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('category', formData.category);
+    
+    // If editing, exclude the current budget from conflict check
+    if (editingBudget) {
+      query = query.neq('id', editingBudget.id);
+    }
+
+    const { data: existingBudgets } = await query;
+
+    if (existingBudgets && existingBudgets.length > 0) {
+      const hasOverlap = existingBudgets.some((b) => {
+        const { start: exStart, end: exEnd } = getBudgetRange(b.month, b.period);
+        return areIntervalsOverlapping(
+          { start: newStart, end: newEnd },
+          { start: exStart, end: exEnd }
+        );
+      });
+
+      if (hasOverlap) {
+        toast.error(`A '${formData.category}' budget already exists for this time period.`);
+        return;
+      }
+    }
+
+    // 2. INSERT OR UPDATE BUDGET
+    const payload = {
       user_id: user.id,
       category: formData.category,
       limit_amount: parseFloat(formData.limitAmount),
-      month: monthDate,
+      month: selectedDate,
       period: formData.period,
-    });
+    };
+
+    let error;
+    
+    if (editingBudget) {
+      // Update existing budget
+      const { error: updateError } = await supabase
+        .from('budgets')
+        .update(payload)
+        .eq('id', editingBudget.id);
+      error = updateError;
+    } else {
+      // Create new budget
+      const { error: insertError } = await supabase
+        .from('budgets')
+        .insert(payload);
+      error = insertError;
+    }
 
     if (error) {
       if (error.code === '23505') {
-        toast.error('Budget already exists for this category and month');
+        toast.error('Budget already exists for this category and date');
       } else {
-        toast.error('Failed to create budget');
+        toast.error(editingBudget ? 'Failed to update budget' : 'Failed to create budget');
       }
     } else {
-      toast.success('Budget created successfully');
-      setFormData({ category: '', limitAmount: '', month: new Date().toISOString().substring(0, 7), period: 'monthly' });
+      toast.success(editingBudget ? 'Budget updated successfully' : 'Budget created successfully');
       setOpen(false);
       loadBudgets();
     }
@@ -103,7 +202,7 @@ export default function Budgets() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Budgets</h1>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -112,7 +211,7 @@ export default function Budgets() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Set New Budget</DialogTitle>
+                <DialogTitle>{editingBudget ? 'Edit Budget' : 'Set New Budget'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -141,10 +240,10 @@ export default function Budgets() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="month">{formData.period === 'weekly' ? 'Week Starting' : 'Month'}</Label>
+                  <Label htmlFor="month">Start Date</Label>
                   <Input
                     id="month"
-                    type={formData.period === 'weekly' ? 'date' : 'month'}
+                    type="date"
                     value={formData.month}
                     onChange={(e) => setFormData({ ...formData, month: e.target.value })}
                     required
@@ -163,7 +262,9 @@ export default function Budgets() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full">Set Budget</Button>
+                <Button type="submit" className="w-full">
+                  {editingBudget ? 'Update Budget' : 'Set Budget'}
+                </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -191,9 +292,23 @@ export default function Budgets() {
                         <CardTitle className="text-lg">{budget.category}</CardTitle>
                         <p className="text-sm text-muted-foreground">{periodLabel} ({budget.period})</p>
                       </div>
-                      {percentage >= 80 && (
-                        <AlertCircle className={percentage >= 100 ? 'text-destructive' : 'text-warning'} />
-                      )}
+                      
+                      <div className="flex items-center gap-2">
+                         {/* Show Alert Icon if over budget */}
+                        {percentage >= 80 && (
+                          <AlertCircle className={`h-5 w-5 ${percentage >= 100 ? 'text-destructive' : 'text-warning'}`} />
+                        )}
+                        
+                        {/* Edit Button */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(budget)}>
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        
+                        {/* Delete Button */}
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(budget.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">

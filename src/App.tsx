@@ -12,6 +12,7 @@ import TermsOfService from "./pages/TermsOfService";
 
 // Lazy load pages
 const Auth = lazy(() => import("./pages/Auth"));
+const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 const LandingPage = lazy(() => import("./pages/Landing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Transactions = lazy(() => import("./pages/Transactions"));
@@ -41,6 +42,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/dashboard" element={<Dashboard />} />

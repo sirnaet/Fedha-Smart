@@ -338,7 +338,7 @@ export default function Transactions() {
                             variant="ghost" 
                             size="icon"
                             onClick={() => handleDelete(t.id, t.type)}
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
