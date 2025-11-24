@@ -1,3 +1,5 @@
+import React from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Wallet, TrendingUp, PiggyBank, Target, BarChart3, Instagram, Linkedin } from "lucide-react";
@@ -46,7 +48,7 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Navigation */}
       <nav className="border-b border-border">
         <div className="container mx-auto px-3 py-4 flex items-center justify-between">
@@ -140,6 +142,17 @@ const Landing = () => {
           </div>
           
           <div className="flex items-center gap-6">
+            <div className="flex gap-4 text-sm text-muted-foreground">
+              <Link to="/privacy" className="hover:text-primary transition-colors hover:underline">
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="hover:text-primary transition-colors hover:underline">
+                Terms of Service
+              </Link>
+            </div>
+
+            {/* Separator for desktop */}
+            <div className="hidden md:block w-px h-4 bg-border"></div>
             {/* X (Twitter) Link */}
             <a 
               href="https://x.com/Sir__naet" 
